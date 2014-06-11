@@ -19,3 +19,11 @@
 *.exe
 *.out
 *.app
+
+Library/
+ProjectSettings/
+Temp/
+*.csproj
+*.sln
+*.userprefs
+*.meta
