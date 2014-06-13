@@ -8,8 +8,11 @@ public class GameManager : MonoBehaviour {
 
 	public const int PLAY_WITH_AI = 0;	//和AI对战
 	public const int PLAY_WITH_NET = 1;	//联网对战
+	public const int PLAY_WITH_ME = 2;	//自己单击玩
+
 	public const int FIRST_ME = 1;		//自己先走
 	public const int FIRST_OTHER = 2;	//不是自己先走
+
 	public const int LEVEL_NORMAL = 1;	//普通难度
 	public const int LEVEL_HARD = 2;	//困难难度
 	public const int LEVEL_EXPERT = 3;	//专家难度
@@ -42,6 +45,8 @@ public class GameManager : MonoBehaviour {
 		Debug.Log ("PlayWith: "+playWithWho+"  WhoGoFirst: "+whoGoFirst+"  HardLevel: "+hardLevel+" CanBackCount: "+canBackSteps);
 		gameState = STATE_GAMING;	//初始状态
 		gameSubState = STATE_BLACK;	//黑棋走
+		//playWithWho = PLAY_WITH_AI;
+		//Debug.Log ("(1,1): "+(int)gameData [1, 1]); //--> 0
 	}
 	
 	// Update is called once per frame
@@ -55,23 +60,40 @@ public class GameManager : MonoBehaviour {
 					int id = int.Parse(hit.collider.name) - 1;			//点击对象的编号,从1开始的
 					int row = id / ROW_COUNT;						//获得对应数据中行列
 					int column = id % ROW_COUNT;
-					if(gameData[row,column] !='b' && gameData[row,column]!='w'){	//该位置还没有棋子
+					if((int)gameData[row,column] == 0){	//该位置还没有棋子
 						if(gameSubState == STATE_BLACK){
 							hit.collider.renderer.material = blackMaterial;	//黑棋走赋予黑色材质
 							gameSubState = STATE_WHITE;						//改为该白棋走
-							gameData[row,column] = 'b';						//存数据							
+							gameData[row,column] = 'b';						//存数据		
+							//Debug.Log("Score : "+AI.GetScoreAtPoint(gameData,'b',row,column));
+							//Point p = AI.GetBestPoint(gameData, 'w', 'b');
+							//Debug.Log("White's next position :("+ p.x + ","+ p.y+")");
 						}else if(gameSubState == STATE_WHITE){
-							hit.collider.renderer.material = whiteMaterial;	//该白棋有赋予白色材质
-							gameSubState = STATE_BLACK;						//改为该黑棋走
-							gameData[row,column] = 'w';						//存数据
+							if( playWithWho == PLAY_WITH_ME){	//自己玩
+								hit.collider.renderer.material = whiteMaterial;	//该白棋有赋予白色材质
+								gameSubState = STATE_BLACK;						//改为该黑棋走
+								gameData[row,column] = 'w';						//存数据
+							}
 						}
 						hit.collider.renderer.enabled = true;				//显示对象
 						IsGameOver(row,column);								//判断是否游戏结束
 						
-						Debug.Log(id + "("+row+","+column+") :"+gameData[row,column] + " GameState: " + gameState);	//调试输出数据
-					}else{	//该位置有棋子
+						//Debug.Log("id: "+id + "("+row+","+column+") :"+gameData[row,column] + " GameState: " + gameState);	//调试输出数据
+					}else{	//该位置已经有棋子
 						
 					}
+				}
+			}
+			// AI 下子
+			if( gameSubState == STATE_WHITE ){
+				if( playWithWho == PLAY_WITH_AI){				//和AI玩
+					Point p = AI.GetBestPoint(gameData, 'w', 'b');
+					Debug.Log("White's next position :("+ p.x + ","+ p.y+")");
+					gameSubState = STATE_BLACK;						//改为该黑棋走
+					gameData[p.x,p.y] = 'w';						//存数据
+					//PutChessAtPoint( p,'w');
+					StartCoroutine(PutChessAtPoint( p,'w'));				//C# 脚本这样写
+					IsGameOver(p.x,p.y);								//判断是否游戏结束
 				}
 			}
 			break;
@@ -79,6 +101,21 @@ public class GameManager : MonoBehaviour {
 			break;
 		}
 
+	}
+
+	//在指定位置，显示 ‘c' 代表类型的棋子
+	IEnumerator  PutChessAtPoint( Point p ,char c){
+		int id;		//棋子ID
+		id = p.x * ROW_COUNT + p.y + 1;	//棋子编号从1开始
+		GameObject chess = GameObject.Find ("qi_pan1/"+id);
+		//Debug.Log ("show chess :" + id +"name:"+ (chess == null ? "null" : chess.name));
+		if( c == 'w' ){	//白色
+			chess.renderer.material = whiteMaterial;
+		}else if ( c == 'b' ){	//黑色
+			chess.renderer.material = blackMaterial;
+		}
+		yield return new WaitForSeconds (0.5f);	//延迟0.5s
+		chess.renderer.enabled = true;	//显示
 	}
 
 	//检测落下一个棋子时游戏是否结束

@@ -10,7 +10,7 @@ using System.Collections;
 
 public class MenuSet : MonoBehaviour {
 
-	string[] toolbarStrings = { "人机对战", "网络对战" };	//工具条按钮显示字符串
+	string[] toolbarStrings = { "人机对战", "网络对战" ,"自己玩耍"};	//工具条按钮显示字符串
 	int toolbarSelectID;		//选择了工具条那个按钮
 
 	bool isMeGoFirst = true;		//自己先走
@@ -86,6 +86,8 @@ public class MenuSet : MonoBehaviour {
 			break;
 		case 1:	//网络对战
 			break;
+		case 2:	//自己玩
+			break;
 		}
 		//退几步棋
 		GUILayout.BeginArea(new Rect(10,200,200,100));
@@ -102,13 +104,18 @@ public class MenuSet : MonoBehaviour {
 				GameManager.canBackSteps = canBackSteps;
 				Application.LoadLevel("game");				//切换到游戏场景
 			}else if(toolbarSelectID == 1){	//联网对战
+
+			}else if(toolbarSelectID == 2){	//自己玩耍
+				GameManager.playWithWho = GameManager.PLAY_WITH_ME;
+				GameManager.canBackSteps = canBackSteps;
+				Application.LoadLevel("game");
 			}
 		}
 		GUILayout.EndArea();
 	}
 	// Use this for initialization
 	void Start () {
-	
+
 	}
 	
 	// Update is called once per frame
