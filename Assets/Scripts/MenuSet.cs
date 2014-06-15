@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using System.Collections;
+using System;
 
 /**
  * A) 能够人机对弈，可选择人先走或人后走，具体规则参考通用的五子棋规则；
@@ -22,7 +23,22 @@ public class MenuSet : MonoBehaviour {
 	bool isExpertLevel = false;			//专家难度
 	int level;						//难度级别, 1 普通 ,2 困难 ,3 专家  同样为实现单选功能
 
+	bool isAsServer = true;			//作为服务端
+	bool isAsClient = false;		//作为客户端
+	int peerType;					//1 作为服务端,2 作为客户端
+	string serverPort = "8888";		//服务端端口
+	string serverIP = "127.0.0.1";	//服务端IP, "127.1.1.1"居然连接不上，不明原因
+	string connectInfo;				//连接显示信息
+	float connectTime = 0;			//客户端连接时间
+	
+	float oldTime;		//计时
+	int frame;			//记录字符串状态，动态文字
+
 	int canBackSteps = 5;			//连续悔几步棋
+
+	void Start(){
+
+	}
 
 	void OnGUI(){
 		GUILayout.BeginArea (new Rect (10, 10, 200, 100));
@@ -32,7 +48,7 @@ public class MenuSet : MonoBehaviour {
 		switch(toolbarSelectID){
 		case 0:	//人机对战
 			//谁先走
-			GUILayout.BeginArea(new Rect(10,100,100,100));
+			GUILayout.BeginArea(new Rect(10,80,100,100));
 			isMeGoFirst = GUILayout.Toggle( isMeGoFirst, "我先走");
 			if(isMeGoFirst){
 				isAIGoFirst =false;
@@ -52,7 +68,7 @@ public class MenuSet : MonoBehaviour {
 			}
 			//难度级别
 			GUILayout.EndArea();
-			GUILayout.BeginArea(new Rect(120,100,100,150));
+			GUILayout.BeginArea(new Rect(120,80,100,150));
 			isNormalLevel = GUILayout.Toggle(isNormalLevel, "普通");
 			if(isNormalLevel){
 				isHardlevel =false;
@@ -85,15 +101,63 @@ public class MenuSet : MonoBehaviour {
 			GUILayout.EndArea();
 			break;
 		case 1:	//网络对战
+			GUILayout.BeginArea( new Rect(10,60, 600,150));
+
+			GUILayout.BeginHorizontal(GUILayout.Width(350),GUILayout.Height(30));	//水平布局
+			isAsServer = GUILayout.Toggle(isAsServer, "作为服务端",GUILayout.Width(100));
+			if(isAsServer){
+				GUILayout.Box("服务端端口: ",GUILayout.Width(100));
+				serverPort = GUILayout.TextField( serverPort, GUILayout.Width(50) );
+				if ( GUILayout.Button( "开启服务器", GUILayout.Width(100) ) ){
+					StartServer();
+				}
+				isAsClient = false;			//作为客户端选项为假，只能做一种类型，为实现单选
+				peerType = 1;
+				if( Network.peerType == NetworkPeerType.Connecting){	//连接中
+					Network.Disconnect();	//断开连接
+					connectInfo = "";		//清空字符串
+				}
+			}
+			GUILayout.EndHorizontal();		//结束水平布局
+
+			GUILayout.BeginHorizontal(GUILayout.Width(550),GUILayout.Height(30));
+			isAsClient = GUILayout.Toggle( isAsClient,"作为客户端",GUILayout.Width(100));
+			if(isAsClient){
+				GUILayout.Box("服务端IP: ", GUILayout.Width(100));
+				serverIP = GUILayout.TextField(serverIP, GUILayout.Width(100));
+				GUILayout.Box("服务端端口: ", GUILayout.Width(100));
+				serverPort = GUILayout.TextField(serverPort, GUILayout.Width(50));
+				if(GUILayout.Button("连接服务器" , GUILayout.Width(100))){
+					ConnectServer();
+				}
+				isAsServer = false;
+				peerType = 2;
+				if(Network.peerType == NetworkPeerType.Server){	//断开连接
+					Network.Disconnect();
+					connectInfo = "";	//清空字符
+				}
+			}
+			if( peerType == 1){
+				isAsServer = true;
+				isAsClient = false;
+			}else if( peerType == 2){
+				isAsServer = false;
+				isAsClient = true;
+			}
+			GUILayout.EndHorizontal();
+			GUILayout.Box(connectInfo, GUILayout.Width(350), GUILayout.Height(60));
+			GUILayout.EndArea();
 			break;
 		case 2:	//自己玩
 			break;
 		}
 		//退几步棋
-		GUILayout.BeginArea(new Rect(10,200,200,100));
-		GUILayout.Label("可连续退几步棋: "+canBackSteps);
-		canBackSteps = (int)GUILayout.HorizontalSlider(canBackSteps,0,10);
-		GUILayout.EndArea();
+		if( toolbarSelectID != 2 ){	//自己玩悔棋次数不限
+			GUILayout.BeginArea(new Rect(10,200,200,100));
+			GUILayout.Label("可连续退几步棋: "+canBackSteps);
+			canBackSteps = (int)GUILayout.HorizontalSlider(canBackSteps,0,10);
+			GUILayout.EndArea();
+		}
 		//开始按钮
 		GUILayout.BeginArea(new Rect(10,250,200,100));
 		if(GUILayout.Button("开始游戏")){
@@ -104,22 +168,110 @@ public class MenuSet : MonoBehaviour {
 				GameManager.canBackSteps = canBackSteps;
 				Application.LoadLevel("game");				//切换到游戏场景
 			}else if(toolbarSelectID == 1){	//联网对战
-
+				GameManager.playWithWho = GameManager.PLAY_WITH_NET;
+				if(isAsServer){
+					GameManager.whoGoFirst = GameManager.FIRST_ME;	//服务端先走
+				}else if(isAsClient){
+					GameManager.whoGoFirst = GameManager.FIRST_OTHER;	//如果不是服务端后走
+				}
+				GameManager.canBackSteps = canBackSteps;
+				Application.LoadLevel("game");
 			}else if(toolbarSelectID == 2){	//自己玩耍
 				GameManager.playWithWho = GameManager.PLAY_WITH_ME;
-				GameManager.canBackSteps = canBackSteps;
+				GameManager.canBackSteps = 999;
 				Application.LoadLevel("game");
 			}
 		}
 		GUILayout.EndArea();
-	}
-	// Use this for initialization
-	void Start () {
 
+		//网络连接状态
+		switch(Network.peerType){
+		case NetworkPeerType.Disconnected:	//未连接
+			connectInfo = "连接断开";
+			break;
+		case NetworkPeerType.Client:	//作为客户端
+			connectInfo = "连接服务器成功";
+			break;
+		case NetworkPeerType.Server:	//作为服务端
+			if( Network.connections.Length <= 0 ){	//没有客户端连接
+				if(Time.time - oldTime > 0.3){	//每0.3s
+					oldTime = Time.time;
+					frame++;
+					if(frame > 3){
+						frame = 0;
+					}
+				}
+				if(frame == 0){
+					connectInfo = "服务端监听中,等待客户端连接";
+				}else if(frame == 1){
+					connectInfo = "服务端监听中,等待客户端连接.";
+				}else if(frame == 2){
+					connectInfo = "服务端监听中,等待客户端连接..";
+				}else if(frame == 3){
+					connectInfo = "服务端监听中,等待客户端连接...";
+				}
+			}else if(Network.connections.Length > 0){	//有客户端连接
+				Debug.Log("We have clients");
+				connectInfo = "客户端 : " + Network.connections[0].ipAddress + "["+ Network.connections[0].port+"] 已连接可开始游戏." ;
+			}
+			break;
+		case NetworkPeerType.Connecting:	//尝试连接服务器
+			Debug.Log("connecting...");
+			break;
+		}
+//		if(Time.time - connectTime > 5.0f && connectTime != 0 && Network.peerType != NetworkPeerType.Client){
+//			connectInfo = "连接服务器失败,请确认IP和端口是否正确";
+//			Network.Disconnect();
+//			connectTime = 0;
+//		}
 	}
 	
 	// Update is called once per frame
 	void Update () {
-	
+
 	}
+
+	//开启服务器
+	void StartServer(){
+
+		int port = 0;	//端口
+		try{
+			port = int.Parse (serverPort);
+		}catch( Exception e ){
+			//Debug.Log("Catch you !");
+			connectInfo = "请输入合法端口!";
+			return;
+		}
+		Debug.Log ("ServerPort:" + port);
+		NetworkConnectionError error = Network.InitializeServer (10, port,false);
+		if(error == NetworkConnectionError.NoError){
+			connectInfo = "服务端监听中,等待客户端连接...";
+		}else{
+			connectInfo = "开启失败:"+error;
+			return;
+		}
+
+	}
+	
+	//连接服务器
+	void ConnectServer(){
+		string ip = serverIP;
+		int port = 0;
+		try{
+			port = int.Parse (serverPort);
+		}catch( Exception e ){
+			connectInfo = "请输入合法端口!";
+			return;
+		}
+		//Debug.Log (ip + ":" + port);
+		NetworkConnectionError error = Network.Connect (ip,port);
+		if(error == NetworkConnectionError.NoError){
+			connectInfo = "连接服务器中...";
+			connectTime = Time.time;
+		}else{
+			connectInfo = "连接失败,请检查ip,端口是否正确!";
+			return;
+		}
+	}
+	
 }
