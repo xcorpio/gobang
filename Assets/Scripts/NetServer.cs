@@ -7,7 +7,6 @@ public class NetServer : MonoBehaviour {
 	string inputMessage = "";	//输入框信息
 	string showMessage = "";	//显示信息
 	bool netErrorShow = true;	//是否该通知用户，对方已下线
-	GUIStyle boxStyle; 			//显示框样式
 
 	// Use this for initialization
 	void Start () {
@@ -15,12 +14,6 @@ public class NetServer : MonoBehaviour {
 	}
 	
 	void OnGUI(){
-		boxStyle = GUI.skin.box;	//所有Box都是一个style?
-		boxStyle.alignment = TextAnchor.UpperLeft;	//左上对齐
-		boxStyle.richText = true;		//富文本
-		boxStyle.wordWrap = true;		//自动换行
-		boxStyle.normal.textColor = Color.magenta;	//字体颜色
-		boxStyle.stretchHeight = true;	//高度自动延伸
 
 		//显示聊天框
 		GUILayout.BeginArea (new Rect (5, 10, Screen.width, Screen.height));
@@ -28,7 +21,7 @@ public class NetServer : MonoBehaviour {
 		GUILayout.FlexibleSpace ();	//对齐底部
 		GUILayout.Box ( "\t\t<color=red><b> i am a legend.</b></color>", GUILayout.Width(180));
 		scrollPosition = GUILayout.BeginScrollView (scrollPosition, GUILayout.Width (205), GUILayout.Height (210));
-		GUILayout.Box (showMessage,boxStyle, GUILayout.Width (180));	//显示信息的Box
+		GUILayout.Box (showMessage, GUILayout.Width (180));	//显示信息的Box
 		GUILayout.EndScrollView ();
 		GUILayout.BeginHorizontal ();
 		GUI.SetNextControlName ("message_input");	//设置下个控件名字
@@ -73,6 +66,10 @@ public class NetServer : MonoBehaviour {
 		case NetworkPeerType.Connecting:
 			break;
 		}
+		if( Network.connections.Length <= 0 && GameManager.playWithWho == GameManager.PLAY_WITH_NET && netErrorShow){
+			showMessage += "<color=red>System: <b>对方网络已断开</b></color>\n";
+			netErrorShow = false;
+		}
 	}
 	
 	// Update is called once per frame
@@ -91,7 +88,7 @@ public class NetServer : MonoBehaviour {
 
 	//接收其他人发送消息
 	[RPC]
-	void ReceiveMessage( string message, NetworkMessageInfo info){
+	void ReceiveMessage( string message ){
 		showMessage += "<color=lime>Another Say:</color> "+message + "\n";
 	}
 }

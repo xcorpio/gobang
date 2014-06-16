@@ -21,6 +21,10 @@
 *.app
 
 Library/
+Web/
+index/
+WebClient/
+WebServer/
 ProjectSettings/
 Temp/
 *.csproj

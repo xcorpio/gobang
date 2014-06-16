@@ -2,6 +2,7 @@
 using System.Collections;
 using System;
 
+
 /**
  * A) 能够人机对弈，可选择人先走或人后走，具体规则参考通用的五子棋规则；
  * B) 能够悔棋，最多连续悔5步棋；
@@ -36,17 +37,37 @@ public class MenuSet : MonoBehaviour {
 
 	int canBackSteps = 5;			//连续悔几步棋
 
+	bool isNotStyled = true;		//是否还没设置样式
+	GUIStyle boxStyle; 				//box样式
+
 	void Start(){
 
 	}
 
 	void OnGUI(){
+
+		if(isNotStyled){
+			//会影响到全局
+			boxStyle = GUI.skin.box;	//所有Box都是一个style?
+			boxStyle.alignment = TextAnchor.UpperLeft;	//左上对齐
+			boxStyle.richText = true;		//富文本
+			boxStyle.wordWrap = true;		//自动换行
+			boxStyle.normal.textColor = Color.magenta;	//字体颜色
+			boxStyle.stretchHeight = true;	//高度自动延伸
+			isNotStyled = false;
+		}
+
 		GUILayout.BeginArea (new Rect (10, 10, 200, 100));
 		toolbarSelectID = GUILayout.Toolbar (toolbarSelectID, toolbarStrings);
 		GUILayout.EndArea ();
 
 		switch(toolbarSelectID){
 		case 0:	//人机对战
+
+			if(Network.peerType != NetworkPeerType.Disconnected){
+				Network.Disconnect();	//断开网络
+			}
+
 			//谁先走
 			GUILayout.BeginArea(new Rect(10,80,100,100));
 			isMeGoFirst = GUILayout.Toggle( isMeGoFirst, "我先走");
@@ -149,45 +170,53 @@ public class MenuSet : MonoBehaviour {
 			GUILayout.EndArea();
 			break;
 		case 2:	//自己玩
+
+			if(Network.peerType != NetworkPeerType.Disconnected){
+				Network.Disconnect();	//断开网络
+			}
+
+			GUI.Box( new Rect(10,80,200,100),"Have Fun!");
 			break;
 		}
 		//退几步棋
 		if( toolbarSelectID != 2 ){	//自己玩悔棋次数不限
 			GUILayout.BeginArea(new Rect(10,200,200,100));
-			GUILayout.Label("可连续退几步棋: "+canBackSteps);
+			GUILayout.Label("可退几步棋: "+canBackSteps);
 			canBackSteps = (int)GUILayout.HorizontalSlider(canBackSteps,0,10);
 			GUILayout.EndArea();
 		}
 		//开始按钮
-		GUILayout.BeginArea(new Rect(10,250,200,100));
-		if(GUILayout.Button("开始游戏")){
-			if(toolbarSelectID == 0){	//人机对战
-				GameManager.playWithWho = GameManager.PLAY_WITH_AI;
-				GameManager.whoGoFirst = whoGoFirst;
-				GameManager.hardLevel = level;
-				GameManager.canBackSteps = canBackSteps;
-				Application.LoadLevel("game");				//切换到游戏场景
-			}else if(toolbarSelectID == 1){	//联网对战
-				GameManager.playWithWho = GameManager.PLAY_WITH_NET;
-				if(isAsServer){
-					GameManager.whoGoFirst = GameManager.FIRST_ME;	//服务端先走
-				}else if(isAsClient){
-					GameManager.whoGoFirst = GameManager.FIRST_OTHER;	//如果不是服务端后走
+		if(toolbarSelectID != 1){	//网络对战不显示开始按钮
+			GUILayout.BeginArea(new Rect(10,250,200,100));
+			if(GUILayout.Button("开始游戏")){
+				if(toolbarSelectID == 0){	//人机对战
+					GameManager.playWithWho = GameManager.PLAY_WITH_AI;
+					GameManager.whoGoFirst = whoGoFirst;
+					GameManager.hardLevel = level;
+					GameManager.canBackSteps = canBackSteps;
+					Application.LoadLevel("game");				//切换到游戏场景
+				}else if(toolbarSelectID == 1){	//联网对战
+//					GameManager.playWithWho = GameManager.PLAY_WITH_NET;
+//					if(isAsServer){
+//						GameManager.whoGoFirst = GameManager.FIRST_ME;	//服务端先走
+//					}else if(isAsClient){
+//						GameManager.whoGoFirst = GameManager.FIRST_OTHER;	//如果不是服务端后走
+//					}
+//					GameManager.canBackSteps = canBackSteps;
+//					Application.LoadLevel("game");
+				}else if(toolbarSelectID == 2){	//自己玩耍
+					GameManager.playWithWho = GameManager.PLAY_WITH_ME;
+					GameManager.canBackSteps = 999;
+					Application.LoadLevel("game");
 				}
-				GameManager.canBackSteps = canBackSteps;
-				Application.LoadLevel("game");
-			}else if(toolbarSelectID == 2){	//自己玩耍
-				GameManager.playWithWho = GameManager.PLAY_WITH_ME;
-				GameManager.canBackSteps = 999;
-				Application.LoadLevel("game");
 			}
+			GUILayout.EndArea();
 		}
-		GUILayout.EndArea();
 
 		//网络连接状态
 		switch(Network.peerType){
 		case NetworkPeerType.Disconnected:	//未连接
-			connectInfo = "连接断开";
+			//connectInfo = "连接断开";
 			break;
 		case NetworkPeerType.Client:	//作为客户端
 			connectInfo = "连接服务器成功";
@@ -217,13 +246,25 @@ public class MenuSet : MonoBehaviour {
 			break;
 		case NetworkPeerType.Connecting:	//尝试连接服务器
 			Debug.Log("connecting...");
+			connectInfo = "连接中...";
 			break;
 		}
-//		if(Time.time - connectTime > 5.0f && connectTime != 0 && Network.peerType != NetworkPeerType.Client){
-//			connectInfo = "连接服务器失败,请确认IP和端口是否正确";
-//			Network.Disconnect();
-//			connectTime = 0;
-//		}
+
+		if(Network.connections.Length > 0){	//开始游戏
+			GameManager.playWithWho = GameManager.PLAY_WITH_NET;
+			if(isAsServer){
+				GameManager.whoGoFirst = GameManager.FIRST_ME;	//服务端先走
+			}else if(isAsClient){
+				GameManager.whoGoFirst = GameManager.FIRST_OTHER;	//如果不是服务端后走
+			}
+			GameManager.canBackSteps = canBackSteps;
+			Application.LoadLevel("game");
+		}
+		if(Time.time - connectTime > 10.0f && connectTime != 0 && Network.peerType != NetworkPeerType.Client){
+			connectInfo = "连接服务器失败,请确认IP和端口是否正确,且已连入网络.";
+			Network.Disconnect();
+			connectTime = 0;
+		}
 	}
 	
 	// Update is called once per frame
@@ -265,13 +306,26 @@ public class MenuSet : MonoBehaviour {
 		}
 		//Debug.Log (ip + ":" + port);
 		NetworkConnectionError error = Network.Connect (ip,port);
-		if(error == NetworkConnectionError.NoError){
-			connectInfo = "连接服务器中...";
-			connectTime = Time.time;
-		}else{
-			connectInfo = "连接失败,请检查ip,端口是否正确!";
-			return;
-		}
+		Debug.Log (error);
+		connectInfo = "连接服务器中...";
+		connectTime = Time.time;
 	}
-	
+
+//	void GetIPs(){
+//		Debug.Log("Unicast Addresses");
+//		NetworkInterface[] adapters  = NetworkInterface.GetAllNetworkInterfaces();
+//		foreach (NetworkInterface adapter in adapters)
+//		{
+//			IPInterfaceProperties adapterProperties = adapter.GetIPProperties();
+//			UnicastIPAddressInformationCollection uniCast = adapterProperties.UnicastAddresses;
+//			if (uniCast.Count >0)
+//			{
+//				Debug.Log(adapter.Description);
+//				foreach (UnicastIPAddressInformation uni in uniCast)
+//				{
+//					Debug.Log("  Unicast Address ......................... : {0}"+ uni.Address);
+//				}
+//			}
+//		}
+//	}
 }

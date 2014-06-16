@@ -41,7 +41,7 @@ public class GameManager : MonoBehaviour {
 	private char myChess;		//指定自己使用的棋子类型，在 IsGameOver() 中判断输赢
 	private bool isMyTurn;		//是否该我下
 	private Stack record = new Stack ();	//记录每步的栈,用于悔棋
-
+	private bool isBacking ;	//指示是否是自己在悔棋，只用在网络对战中
 
 	// Use this for initialization
 	void Start () {
@@ -65,7 +65,7 @@ public class GameManager : MonoBehaviour {
 			myChess = 'b';
 			isMyTurn = true;
 		}else if(whoGoFirst == FIRST_OTHER && playWithWho == PLAY_WITH_NET){	//net对战，对方先走
-			gameSubState = STATE_WHITE;	//白棋走
+			gameSubState = STATE_BLACK;	//黑棋走
 			myChess = 'w';
 			isMyTurn = false;
 		}
@@ -79,31 +79,40 @@ public class GameManager : MonoBehaviour {
 			Ray ray = Camera.main.ScreenPointToRay (Input.mousePosition);
 			RaycastHit hit;
 			if(Physics.Raycast(ray, out hit)){	//检测射线是否碰到物体
-				if(Input.GetMouseButtonDown(0)){		//单击左键
+				if(Input.GetMouseButtonUp(0)){		//单击左键弹起该响应位置
 					int id = int.Parse(hit.collider.name) - 1;			//点击对象的编号,从1开始的
 					int row = id / ROW_COUNT;						//获得对应数据中行列
 					int column = id % ROW_COUNT;
 					if((int)gameData[row,column] == 0){	//该位置还没有棋子
-						if(gameSubState == STATE_BLACK){
+						if(isMyTurn && gameSubState == STATE_BLACK ){
 							hit.collider.renderer.material = blackMaterial;	//黑棋走赋予黑色材质
 							gameSubState = STATE_WHITE;						//改为该白棋走
-							gameData[row,column] = 'b';						//存数据		
-							isMyTurn = false;								//轮到其他人下
-							if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
-								canBackSteps ++;				//没到 5 之前 ++
+							if(Network.peerType != NetworkPeerType.Disconnected && playWithWho == PLAY_WITH_NET){//发给网友
+								networkView.RPC("NetPutChess",RPCMode.Others,row,column);
 							}
+							gameData[row,column] = 'b';						//存数据	
+							if( playWithWho == PLAY_WITH_ME ){
+								isMyTurn = true;
+							}else{
+								isMyTurn = false;								//轮到其他人下
+							}
+//							if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
+//								canBackSteps ++;				//没到 5 之前 ++
+//							}
 							hit.collider.renderer.enabled = true;				//显示对象
 							record.Push( new Point(row,column));				//记录压栈
 							IsGameOver(row,column);								//判断是否游戏结束
-						}else if(gameSubState == STATE_WHITE){	//鼠标控制点击
-							if( playWithWho == PLAY_WITH_AI ){	// 和AI玩，ＡＩ先走
-
+						}else if(isMyTurn && gameSubState == STATE_WHITE ){	//鼠标控制点击
+							if( playWithWho == PLAY_WITH_AI || playWithWho == PLAY_WITH_NET){
 								isMyTurn = false;
-								if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
-									canBackSteps ++;				//没到 5 之前 ++
-								}
+//								if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
+//									canBackSteps ++;				//没到 5 之前 ++
+//								}
 							}else if( playWithWho == PLAY_WITH_ME ){//和自己玩
 								isMyTurn = true;
+							}
+							if(Network.peerType != NetworkPeerType.Disconnected && playWithWho == PLAY_WITH_NET){//发给网友
+								networkView.RPC("NetPutChess",RPCMode.Others,row,column);
 							}
 							hit.collider.renderer.material = whiteMaterial;	//该白棋有赋予白色材质
 							gameSubState = STATE_BLACK;						//改为该黑棋走
@@ -112,7 +121,6 @@ public class GameManager : MonoBehaviour {
 							record.Push( new Point(row,column));				//记录压栈
 							IsGameOver(row,column);								//判断是否游戏结束
 						}
-						//Debug.Log("id: "+id + "("+row+","+column+") :"+gameData[row,column] + " GameState: " + gameState);	//调试输出数据
 					}else{	//该位置已经有棋子
 						
 					}
@@ -130,8 +138,8 @@ public class GameManager : MonoBehaviour {
 						isMyTurn = true;			//该我下了
 						record.Push(p);				//记录压栈
 						IsGameOver(p.x,p.y);
-					}else if ( playWithWho == PLAY_WITH_NET ){	//联网对战
-						
+					}else if ( playWithWho == PLAY_WITH_NET ){	//联网对战,网友下白子
+						//Debug.Log ("net white");	//由NetPutChess 控制
 					}
 				}else if (gameSubState == STATE_BLACK ){	//其他人该下黑子
 					if( playWithWho == PLAY_WITH_AI ){	//AI下黑子
@@ -144,7 +152,7 @@ public class GameManager : MonoBehaviour {
 						record.Push(p);				//记录压栈
 						IsGameOver(p.x,p.y);
 					}else if( playWithWho == PLAY_WITH_NET ){	//网友下黑子
-						
+						//Debug.Log ("net black");
 					}
 				}
 			}
@@ -155,6 +163,73 @@ public class GameManager : MonoBehaviour {
 			break;
 		}
 
+	}
+
+	//接受网友下子信息
+	[RPC]
+	void NetPutChess(int row, int column){
+		Point p = new Point(row,column);
+		if( whoGoFirst == FIRST_OTHER ){//该白棋下
+			gameSubState = STATE_WHITE;						//改为该白棋走
+			gameData[row,column] = 'b';						//存数据
+			StartCoroutine(PutChessAtPoint( p,'b'));		//C# 脚本这样写
+			isMyTurn = true;			//该我下了
+			record.Push(p);				//记录压栈
+			IsGameOver(p.x,p.y);
+		}else if(whoGoFirst == FIRST_ME ){//该黑棋下
+			gameSubState = STATE_BLACK;						//改为该黑棋走
+			gameData[p.x,p.y] = 'w';						//存数据
+			StartCoroutine(PutChessAtPoint( p,'w'));		//C# 脚本这样写
+			isMyTurn = true;			//该我下了
+			record.Push(p);				//记录压栈
+			IsGameOver(p.x,p.y);
+		}
+//		if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
+//			canBackSteps ++;				//没到 5 之前 ++
+//		}
+	}
+
+	//接受net悔棋
+	[RPC]
+	void NetRollback(){
+		Point last = (Point) record.Pop();	//上次下棋位置
+		if( gameData[last.x,last.y] == myChess && isBacking || gameData[last.x,last.y] != myChess && !isBacking){	//上次是自己下的,且我在悔棋 或 对方在悔棋
+			if(gameData[last.x,last.y] == 'b'){	//当前该位置是黑棋
+				gameSubState = STATE_BLACK;		//该黑棋下
+			}else{		//白棋
+				gameSubState = STATE_WHITE;		//该白棋下
+			}
+			gameData[last.x,last.y] = '\0';	//清空该位置
+			int id = last.x * ROW_COUNT+last.y + 1;	//获得棋子ID从1开始编号
+			GameObject chess = GameObject.Find("qi_pan1/"+ id );	//获得被取消的对象
+			chess.renderer.enabled = false;	//隐藏该对象
+		}else if( gameData[last.x,last.y] != myChess && isBacking || gameData[last.x,last.y] == myChess && !isBacking){	//上一步不是我下的,回退对方的上一步，和自己的上一步 或 对方在悔棋
+			//销毁其他上一步
+			gameData[last.x,last.y] = '\0';	//清空该位置
+			int id = last.x * ROW_COUNT+last.y + 1;	//获得棋子ID从1开始编号
+			GameObject chess = GameObject.Find("qi_pan1/"+ id );	//获得被取消的对象
+			chess.renderer.enabled = false;	//隐藏该对象
+			//销毁自己上一步
+			last = (Point) record.Pop();
+			if(gameData[last.x,last.y] == 'b'){	//当前该位置是黑棋
+				gameSubState = STATE_BLACK;		//该黑棋下
+			}else{		//白棋
+				gameSubState = STATE_WHITE;		//该白棋下
+			}
+			gameData[last.x,last.y] = '\0';	//清空该位置
+			id = last.x * ROW_COUNT+last.y + 1;	//获得棋子ID从1开始编号
+			chess = GameObject.Find("qi_pan1/"+ id );	//获得被取消的对象
+			chess.renderer.enabled = false;	//隐藏该对象
+		}
+		if(isBacking){//是否是自己在悔棋
+			isMyTurn = true;
+			isBacking = false;
+		}else{
+			isMyTurn =false;
+		}
+		if(gameState != STATE_GAMING){	//如果游戏结束，还可以反悔
+			gameState = STATE_GAMING;
+		}
 	}
 
 	//悔棋
@@ -216,12 +291,23 @@ public class GameManager : MonoBehaviour {
 				if(gameState != STATE_GAMING){	//如果游戏结束，还可以反悔
 					gameState = STATE_GAMING;
 				}
-				GameManager.canBackSteps --;
+				canBackSteps --;
 			}else{	//没有机会悔棋
 				Debug.Log("悔棋次数已经用完");
 			}
 		}else if( playWithWho == PLAY_WITH_NET ){	//网络对战
-
+			if(canBackSteps > 0){
+				Point p = (Point) record.Peek();
+				char c = gameData[p.x,p.y];
+				if ( c == myChess && record.Count >= 1 || c != myChess && record.Count >= 2){	//自己下的上一步，至少有一个棋子，对面下的上一步，至少有两个棋子
+					isBacking = true;		//设置悔棋标志
+					networkView.RPC("ReceiveMessage",RPCMode.Others,"<color=red><i><b>我要悔棋了！</b></i></color>");
+					networkView.RPC("NetRollback",RPCMode.All);		//自己和网友都通过这种方式
+					canBackSteps -- ;
+				}
+			}else{
+				Debug.Log("悔棋次数已经用完");
+			}
 		}
 
 		//Debug.Log ("Stack Current Size: " + record.Count);
