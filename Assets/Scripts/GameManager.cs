@@ -3,8 +3,20 @@ using System.Collections;
 
 public class GameManager : MonoBehaviour {
 
-	public const int ROW_COUNT = 9;	//行数
-	public const int COLUMN_COUNT = 9; //列数
+	public const int ROW_COUNT = 15;	//行数
+	public const int COLUMN_COUNT = 15; //列数
+	
+	//声音对象
+	public AudioSource musicPutStone;	//落子声音
+	public AudioSource musicError;		//错误提示声音
+	public AudioSource musicUndo;		//悔棋声音
+
+	//贴图
+	public Texture texLose;		//失败贴图
+	public Texture texWin;		//胜利贴图
+	private bool isShowOverWindow = false;	//是否显示结束窗口
+	private bool isHasShowOverWindow = false;	//是否已经显示过
+	private Rect windowRect = new Rect((Screen.width - 350)/2,(Screen.height - 250)/2,350,250);
 
 	public const int PLAY_WITH_AI = 1;	//和AI对战
 	public const int PLAY_WITH_NET = 2;	//联网对战
@@ -24,7 +36,9 @@ public class GameManager : MonoBehaviour {
 	public static int maxBackSteps;	//最多可以回退数
 
 	public Material blackMaterial;	//黑棋材质
+	public Material blackRedMaterial;
 	public Material whiteMaterial;	//白棋材质
+	public Material whiteRedMaterial;
 
 	//游戏状态
 	public const int STATE_BLACK = 1;	//黑棋走
@@ -33,8 +47,7 @@ public class GameManager : MonoBehaviour {
 	public const int STATE_LOSE = 4;	//输了
 	public const int STATE_GAMING = 5;	//游戏中
 
-
-
+	
 	private int gameState;			//游戏当前状态
 	private int gameSubState;		//游戏子状态
 	private char[,] gameData = new char[ROW_COUNT,COLUMN_COUNT];	//存储游戏棋盘信息,'b' 代表黑子，'w' 代表白子
@@ -54,11 +67,17 @@ public class GameManager : MonoBehaviour {
 			isMyTurn = true;
 		}else if( whoGoFirst == FIRST_OTHER && playWithWho == PLAY_WITH_AI){	//AI先走
 			gameData[ROW_COUNT/2,COLUMN_COUNT/2] = 'b';
+			if(MouseLook.isMusicOn){
+				if(musicPutStone != null){
+					musicPutStone.Play();
+				}
+			}
 			StartCoroutine(PutChessAtPoint(new Point(ROW_COUNT / 2, COLUMN_COUNT / 2),'b'));	//C# 必须自己调用StartCoroutine
 			gameSubState = STATE_WHITE;	//白棋走
 			myChess = 'w';
 			isMyTurn = true;
 			record.Push( new Point(ROW_COUNT/2, COLUMN_COUNT/2));			//记录压栈
+			LightLastChess();
 		}
 		if( whoGoFirst == FIRST_ME && playWithWho == PLAY_WITH_NET ){	//net对战，我先走，此处代码冗余，暂不考虑
 			gameSubState = STATE_BLACK;	//黑棋走
@@ -91,6 +110,11 @@ public class GameManager : MonoBehaviour {
 								networkView.RPC("NetPutChess",RPCMode.Others,row,column);
 							}
 							gameData[row,column] = 'b';						//存数据	
+							if(MouseLook.isMusicOn){		//播放声音
+								if(musicPutStone != null){
+									musicPutStone.Play();
+								}
+							}
 							if( playWithWho == PLAY_WITH_ME ){
 								isMyTurn = true;
 							}else{
@@ -101,6 +125,7 @@ public class GameManager : MonoBehaviour {
 //							}
 							hit.collider.renderer.enabled = true;				//显示对象
 							record.Push( new Point(row,column));				//记录压栈
+							LightLastChess();
 							IsGameOver(row,column);								//判断是否游戏结束
 						}else if(isMyTurn && gameSubState == STATE_WHITE ){	//鼠标控制点击
 							if( playWithWho == PLAY_WITH_AI || playWithWho == PLAY_WITH_NET){
@@ -117,8 +142,14 @@ public class GameManager : MonoBehaviour {
 							hit.collider.renderer.material = whiteMaterial;	//该白棋有赋予白色材质
 							gameSubState = STATE_BLACK;						//改为该黑棋走
 							gameData[row,column] = 'w';						//存数据
+							if(MouseLook.isMusicOn){		//播放声音
+								if(musicPutStone != null){
+									musicPutStone.Play();
+								}
+							}
 							hit.collider.renderer.enabled = true;				//显示对象
 							record.Push( new Point(row,column));				//记录压栈
+							LightLastChess();
 							IsGameOver(row,column);								//判断是否游戏结束
 						}
 					}else{	//该位置已经有棋子
@@ -137,6 +168,7 @@ public class GameManager : MonoBehaviour {
 						StartCoroutine(PutChessAtPoint( p,'w'));				//C# 脚本这样写
 						isMyTurn = true;			//该我下了
 						record.Push(p);				//记录压栈
+						LightLastChess();
 						IsGameOver(p.x,p.y);
 					}else if ( playWithWho == PLAY_WITH_NET ){	//联网对战,网友下白子
 						//Debug.Log ("net white");	//由NetPutChess 控制
@@ -150,6 +182,7 @@ public class GameManager : MonoBehaviour {
 						StartCoroutine(PutChessAtPoint( p,'b'));				//C# 脚本这样写
 						isMyTurn = true;			//该我下了
 						record.Push(p);				//记录压栈
+						LightLastChess();
 						IsGameOver(p.x,p.y);
 					}else if( playWithWho == PLAY_WITH_NET ){	//网友下黑子
 						//Debug.Log ("net black");
@@ -158,11 +191,39 @@ public class GameManager : MonoBehaviour {
 			}
 			break;
 		case STATE_WIN:
+			isShowOverWindow = true;
 			break;
 		case STATE_LOSE:
+			isShowOverWindow = true;
 			break;
 		}
+	}
 
+	//高亮上一次下的棋子
+	void LightLastChess(){
+		if(record.Count > 0){	//改变上一次棋的材质
+			Point p = (Point)record.Peek();
+			int id;		//棋子ID
+			id = p.x * ROW_COUNT + p.y + 1;	//棋子编号从1开始
+			GameObject chess = GameObject.Find ("qi_pan1/"+id);
+			if( gameData[p.x,p.y] == 'b' ){
+				chess.renderer.material = blackRedMaterial;
+			}else if( gameData[p.x,p.y] == 'w' ){
+				chess.renderer.material = whiteRedMaterial;
+			}
+			if(record.Count > 1){//恢复上上个材质
+				record.Pop();
+				Point p2 = (Point)record.Peek();
+				id = p2.x * ROW_COUNT + p2.y + 1;	//棋子编号从1开始
+				chess = GameObject.Find ("qi_pan1/"+id);
+				if( gameData[p2.x,p2.y] == 'b' ){
+					chess.renderer.material = blackMaterial;
+				}else if( gameData[p2.x,p2.y] == 'w' ){
+					chess.renderer.material = whiteMaterial;
+				}
+				record.Push(p);
+			}
+		}
 	}
 
 	//接受网友下子信息
@@ -172,16 +233,28 @@ public class GameManager : MonoBehaviour {
 		if( whoGoFirst == FIRST_OTHER ){//该白棋下
 			gameSubState = STATE_WHITE;						//改为该白棋走
 			gameData[row,column] = 'b';						//存数据
+			if(MouseLook.isMusicOn){		//播放声音
+				if(musicPutStone != null){
+					musicPutStone.Play();
+				}
+			}
 			StartCoroutine(PutChessAtPoint( p,'b'));		//C# 脚本这样写
 			isMyTurn = true;			//该我下了
 			record.Push(p);				//记录压栈
+			LightLastChess();
 			IsGameOver(p.x,p.y);
 		}else if(whoGoFirst == FIRST_ME ){//该黑棋下
 			gameSubState = STATE_BLACK;						//改为该黑棋走
 			gameData[p.x,p.y] = 'w';						//存数据
+			if(MouseLook.isMusicOn){		//播放声音
+				if(musicPutStone != null){
+					musicPutStone.Play();
+				}
+			}
 			StartCoroutine(PutChessAtPoint( p,'w'));		//C# 脚本这样写
 			isMyTurn = true;			//该我下了
 			record.Push(p);				//记录压栈
+			LightLastChess();
 			IsGameOver(p.x,p.y);
 		}
 //		if(canBackSteps < maxBackSteps){	//可连续悔五步棋，不是可以悔5次，注释这个分支就可以 总共悔5次
@@ -229,6 +302,7 @@ public class GameManager : MonoBehaviour {
 		}
 		if(gameState != STATE_GAMING){	//如果游戏结束，还可以反悔
 			gameState = STATE_GAMING;
+			isHasShowOverWindow = false;	//使重新可以显示窗口
 		}
 	}
 
@@ -242,7 +316,6 @@ public class GameManager : MonoBehaviour {
 		}
 		if(playWithWho == PLAY_WITH_ME){	//和自己玩，每次只退上一步，不管黑白,不对反悔次数做限制
 			Point last = (Point)record.Pop();		//出栈
-			isMyTurn = !isMyTurn;			//转换角色
 			if(gameData[last.x,last.y] == 'b'){	//当前该位置是黑棋
 				gameSubState = STATE_BLACK;		//该黑棋下
 			}else{		//白棋
@@ -254,6 +327,7 @@ public class GameManager : MonoBehaviour {
 			chess.renderer.enabled = false;	//隐藏该对象
 			if(gameState != STATE_GAMING){	//如果游戏结束，还可以反悔
 				gameState = STATE_GAMING;
+				isHasShowOverWindow = false;
 			}
 		}else if( playWithWho == PLAY_WITH_AI){	//AI,如果上一步是自己下的，退一步；是AI下的退两步,经验证没有第一种情况
 			if ( GameManager.canBackSteps > 0){	//机会大于0，才可以后退
@@ -290,9 +364,15 @@ public class GameManager : MonoBehaviour {
 				}
 				if(gameState != STATE_GAMING){	//如果游戏结束，还可以反悔
 					gameState = STATE_GAMING;
+					isHasShowOverWindow = false;
 				}
 				canBackSteps --;
 			}else{	//没有机会悔棋
+				if(MouseLook.isMusicOn){		//播放声音
+					if(musicError != null){
+						musicError.Play();
+					}
+				}
 				Debug.Log("悔棋次数已经用完");
 			}
 		}else if( playWithWho == PLAY_WITH_NET ){	//网络对战
@@ -306,10 +386,14 @@ public class GameManager : MonoBehaviour {
 					canBackSteps -- ;
 				}
 			}else{
+				if(MouseLook.isMusicOn){		//播放声音
+					if(musicError != null){
+						musicError.Play();
+					}
+				}
 				Debug.Log("悔棋次数已经用完");
 			}
 		}
-
 		//Debug.Log ("Stack Current Size: " + record.Count);
 	}
 
@@ -395,6 +479,32 @@ public class GameManager : MonoBehaviour {
 		} else {
 			count = 1;
 		}
+	}
+
+	void OnGUI(){
+		if( isShowOverWindow && !isHasShowOverWindow){
+			if(gameState == STATE_WIN ){	//胜利窗口
+				windowRect = GUILayout.Window(1,windowRect,DoWindow,"You Win");
+			}else if(gameState == STATE_LOSE){	//失败窗口
+				windowRect = GUILayout.Window(2,windowRect,DoWindow,"You Lose");
+			}
+		}
+	}
+
+	//绘制窗口
+	void DoWindow(int windowID){
+		if(windowID == 1){
+			GUILayout.Box(texWin,"You Lost");
+			if(GUILayout.Button("确定")){
+				isHasShowOverWindow = true;
+			}
+		}else if(windowID == 2){
+			GUILayout.Box(texLose,GUILayout.Width(350),GUILayout.Height(231));
+			if(GUILayout.Button("确定")){
+				isHasShowOverWindow = true;
+			}
+		}
+		GUI.DragWindow ();
 	}
 }
       

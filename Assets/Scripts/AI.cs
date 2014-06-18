@@ -21,7 +21,7 @@ public class AI : MonoBehaviour {
 	/*获得指定位置'c' 类型棋的得分
 	 * chessBoard 当前盘面
 	 * c 哪类棋的得分
-	 * x,y 位置
+	 * row,column 位置
 	 * 
 	 * 成5:即构成五子连珠, 100分
 	 * 活4:即构成两边均不被拦截的四子连珠、双死4、死4活3， 90分
@@ -135,8 +135,15 @@ public class AI : MonoBehaviour {
 			}else if( count >= 5){
 				xType = CHENG_5;
 			}
-		}else if( LEVEL > 1){	//难度大于简单
+		}else if( LEVEL > 1){	//难度大于简单,考虑 x0x中间有空格的情况
+			for( int i = xStart; i <= column; ++i){
+				count = 0;	//重新计数
+				for(int j = i; j <= i+4 && j<= xEnd; ++ j){
+					if( chessBoard[row,j] == c ){	//本类qizi
 
+					}
+				}
+			}
 		}
 
 		//y,上下方向

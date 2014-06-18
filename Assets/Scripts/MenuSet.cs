@@ -12,6 +12,9 @@ using System;
 
 public class MenuSet : MonoBehaviour {
 
+	public AudioSource music;	//播放音乐
+	bool isPlayMusic = true;	//是否播放
+	public Texture2D bg;	//背景贴图
 	string[] toolbarStrings = { "人机对战", "网络对战" ,"自己玩耍"};	//工具条按钮显示字符串
 	int toolbarSelectID;		//选择了工具条那个按钮
 
@@ -41,10 +44,13 @@ public class MenuSet : MonoBehaviour {
 	GUIStyle boxStyle; 				//box样式
 
 	void Start(){
-
+		Screen.showCursor = true;	//显示光标
+		music.Play ();				//播放声音
 	}
 
 	void OnGUI(){
+
+		GUI.DrawTexture (new Rect (0, 0, Screen.width, Screen.height), bg, ScaleMode.StretchToFill);
 
 		if(isNotStyled){
 			//会影响到全局
@@ -57,8 +63,21 @@ public class MenuSet : MonoBehaviour {
 			isNotStyled = false;
 		}
 
-		GUILayout.BeginArea (new Rect (10, 10, 200, 100));
+		GUILayout.BeginArea (new Rect (20, 20, Screen.width - 30, 100));
+		GUILayout.BeginHorizontal ();
 		toolbarSelectID = GUILayout.Toolbar (toolbarSelectID, toolbarStrings);
+		GUILayout.FlexibleSpace ();
+		isPlayMusic = GUILayout.Toggle (isPlayMusic, "<color=yellow><b>声音开关</b></color>");
+		if(isPlayMusic){
+			if(!music.isPlaying){
+				music.Play();
+			}
+		}else{
+			if(music.isPlaying){
+				music.Pause();				//关闭声音
+			}
+		}
+		GUILayout.EndHorizontal ();
 		GUILayout.EndArea ();
 
 		switch(toolbarSelectID){
@@ -69,7 +88,7 @@ public class MenuSet : MonoBehaviour {
 			}
 
 			//谁先走
-			GUILayout.BeginArea(new Rect(10,80,100,100));
+			GUILayout.BeginArea(new Rect(20,80,100,100));
 			isMeGoFirst = GUILayout.Toggle( isMeGoFirst, "我先走");
 			if(isMeGoFirst){
 				isAIGoFirst =false;
@@ -89,7 +108,7 @@ public class MenuSet : MonoBehaviour {
 			}
 			//难度级别
 			GUILayout.EndArea();
-			GUILayout.BeginArea(new Rect(120,80,100,150));
+			GUILayout.BeginArea(new Rect(140,80,100,150));
 			isNormalLevel = GUILayout.Toggle(isNormalLevel, "普通");
 			if(isNormalLevel){
 				isHardlevel =false;
@@ -122,7 +141,7 @@ public class MenuSet : MonoBehaviour {
 			GUILayout.EndArea();
 			break;
 		case 1:	//网络对战
-			GUILayout.BeginArea( new Rect(10,60, 600,150));
+			GUILayout.BeginArea( new Rect(20,60, 600,150));
 
 			GUILayout.BeginHorizontal(GUILayout.Width(350),GUILayout.Height(30));	//水平布局
 			isAsServer = GUILayout.Toggle(isAsServer, "作为服务端",GUILayout.Width(100));
@@ -175,19 +194,20 @@ public class MenuSet : MonoBehaviour {
 				Network.Disconnect();	//断开网络
 			}
 
-			GUI.Box( new Rect(10,80,200,100),"Have Fun!");
+			GUI.Box( new Rect(20,80,200,100),"Have Fun!");
 			break;
 		}
 		//退几步棋
 		if( toolbarSelectID != 2 ){	//自己玩悔棋次数不限
-			GUILayout.BeginArea(new Rect(10,200,200,100));
+			GUILayout.BeginArea(new Rect(20,200,200,100));
 			GUILayout.Label("可退几步棋: "+canBackSteps);
 			canBackSteps = (int)GUILayout.HorizontalSlider(canBackSteps,0,10);
 			GUILayout.EndArea();
 		}
 		//开始按钮
+
+			GUILayout.BeginArea(new Rect(20,250,200,100));
 		if(toolbarSelectID != 1){	//网络对战不显示开始按钮
-			GUILayout.BeginArea(new Rect(10,250,200,100));
 			if(GUILayout.Button("开始游戏")){
 				if(toolbarSelectID == 0){	//人机对战
 					GameManager.playWithWho = GameManager.PLAY_WITH_AI;
@@ -206,12 +226,16 @@ public class MenuSet : MonoBehaviour {
 //					Application.LoadLevel("game");
 				}else if(toolbarSelectID == 2){	//自己玩耍
 					GameManager.playWithWho = GameManager.PLAY_WITH_ME;
-					GameManager.canBackSteps = 999;
+					GameManager.canBackSteps = 99;
 					Application.LoadLevel("game");
 				}
 			}
-			GUILayout.EndArea();
 		}
+		if(GUILayout.Button("退出游戏")){
+			Application.Quit();
+		}
+		GUILayout.EndArea();
+		
 
 		//网络连接状态
 		switch(Network.peerType){
