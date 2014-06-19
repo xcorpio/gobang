@@ -304,7 +304,7 @@ public class MenuSet : MonoBehaviour {
 			port = int.Parse (serverPort);
 		}catch( Exception e ){
 			//Debug.Log("Catch you !");
-			connectInfo = "请输入合法端口!";
+			connectInfo = "请输入合法端口!"+e.Message;
 			return;
 		}
 		Debug.Log ("ServerPort:" + port);
@@ -325,7 +325,7 @@ public class MenuSet : MonoBehaviour {
 		try{
 			port = int.Parse (serverPort);
 		}catch( Exception e ){
-			connectInfo = "请输入合法端口!";
+			connectInfo = "请输入合法端口!"+e.Message;
 			return;
 		}
 		//Debug.Log (ip + ":" + port);

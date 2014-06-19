@@ -16,7 +16,8 @@ public class GameManager : MonoBehaviour {
 	public Texture texWin;		//胜利贴图
 	private bool isShowOverWindow = false;	//是否显示结束窗口
 	private bool isHasShowOverWindow = false;	//是否已经显示过
-	private Rect windowRect = new Rect((Screen.width - 350)/2,(Screen.height - 250)/2,350,250);
+	private Rect windowRectWin = new Rect((Screen.width - 350)/2,(Screen.height - 250)/2,350,250);	//提示胜利失败窗口位置
+	private Rect windowRectLose = new Rect((Screen.width - 350)/2,(Screen.height - 250)/2,350,250);
 
 	public const int PLAY_WITH_AI = 1;	//和AI对战
 	public const int PLAY_WITH_NET = 2;	//联网对战
@@ -109,6 +110,7 @@ public class GameManager : MonoBehaviour {
 							if(Network.peerType != NetworkPeerType.Disconnected && playWithWho == PLAY_WITH_NET){//发给网友
 								networkView.RPC("NetPutChess",RPCMode.Others,row,column);
 							}
+							//AI.GetScoresMap(gameData,'b');
 							gameData[row,column] = 'b';						//存数据	
 							if(MouseLook.isMusicOn){		//播放声音
 								if(musicPutStone != null){
@@ -127,6 +129,8 @@ public class GameManager : MonoBehaviour {
 							record.Push( new Point(row,column));				//记录压栈
 							LightLastChess();
 							IsGameOver(row,column);								//判断是否游戏结束
+							//Debug.Log("score:"+AI.GetScoreAtPoint(gameData,'b',row,column)) ;
+							//AI.GetScoresMap(gameData,'b');
 						}else if(isMyTurn && gameSubState == STATE_WHITE ){	//鼠标控制点击
 							if( playWithWho == PLAY_WITH_AI || playWithWho == PLAY_WITH_NET){
 								isMyTurn = false;
@@ -161,7 +165,7 @@ public class GameManager : MonoBehaviour {
 			if( !isMyTurn && playWithWho != PLAY_WITH_ME && gameState == STATE_GAMING){//IsGameOver()运行后gameState 可能已经改变
 				if( gameSubState == STATE_WHITE ){	//其他人该下白子
 					if( playWithWho == PLAY_WITH_AI){				//和AI玩
-						Point p = AI.GetBestPoint(gameData, 'w', 'b');
+						Point p = AI.GetBestPoint(gameData, 'w', 'b',hardLevel);
 						Debug.Log("AI's next position :("+ p.x + ","+ p.y+")");
 						gameSubState = STATE_BLACK;						//改为该黑棋走
 						gameData[p.x,p.y] = 'w';						//存数据
@@ -175,7 +179,7 @@ public class GameManager : MonoBehaviour {
 					}
 				}else if (gameSubState == STATE_BLACK ){	//其他人该下黑子
 					if( playWithWho == PLAY_WITH_AI ){	//AI下黑子
-						Point p = AI.GetBestPoint(gameData, 'b', 'w');
+						Point p = AI.GetBestPoint(gameData, 'b', 'w',hardLevel);
 						Debug.Log("AI's next position :("+ p.x + ","+ p.y+")");
 						gameSubState = STATE_WHITE;						//改为该白棋走
 						gameData[p.x,p.y] = 'b';						//存数据
@@ -304,6 +308,7 @@ public class GameManager : MonoBehaviour {
 			gameState = STATE_GAMING;
 			isHasShowOverWindow = false;	//使重新可以显示窗口
 		}
+		LightLastChess ();	//高亮上个棋子
 	}
 
 	//悔棋
@@ -394,6 +399,7 @@ public class GameManager : MonoBehaviour {
 				Debug.Log("悔棋次数已经用完");
 			}
 		}
+		LightLastChess ();	//高亮上个棋子
 		//Debug.Log ("Stack Current Size: " + record.Count);
 	}
 
@@ -484,9 +490,9 @@ public class GameManager : MonoBehaviour {
 	void OnGUI(){
 		if( isShowOverWindow && !isHasShowOverWindow){
 			if(gameState == STATE_WIN ){	//胜利窗口
-				windowRect = GUILayout.Window(1,windowRect,DoWindow,"You Win");
+				windowRectWin = GUILayout.Window(1,windowRectWin,DoWindow,"You Win");
 			}else if(gameState == STATE_LOSE){	//失败窗口
-				windowRect = GUILayout.Window(2,windowRect,DoWindow,"You Lose");
+				windowRectLose = GUILayout.Window(2,windowRectLose,DoWindow,"You Lose");
 			}
 		}
 	}
@@ -494,12 +500,12 @@ public class GameManager : MonoBehaviour {
 	//绘制窗口
 	void DoWindow(int windowID){
 		if(windowID == 1){
-			GUILayout.Box(texWin,"You Lost");
+			GUILayout.Box(texWin);
 			if(GUILayout.Button("确定")){
 				isHasShowOverWindow = true;
 			}
 		}else if(windowID == 2){
-			GUILayout.Box(texLose,GUILayout.Width(350),GUILayout.Height(231));
+			GUILayout.Box(texLose);
 			if(GUILayout.Button("确定")){
 				isHasShowOverWindow = true;
 			}

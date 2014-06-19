@@ -39,7 +39,8 @@ public class MenuInGame : MonoBehaviour {
 	}
 
 	void WindowFunc( int windowID ){
-		GUILayout.Box ("\n鼠标左键下棋.\n右键旋转棋盘.\n中键移动.\n滚轮缩放.\n左上角菜单.\n左下角聊天窗口.\n");
+		GUILayout.Box ("\n鼠标左键下棋.\n右键旋转棋盘.\n中键移动.\n滚轮缩放.\n左上角菜单.\n左下角聊天窗口.\n" +
+			"<color=lime>Author:mr.zheng\nEmail:xcorpio@qq.com\nPhone:15109221400</color>");
 		if( GUILayout.Button ("确定") ){
 			isShowHelpWindow = false;
 		}
