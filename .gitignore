@@ -27,7 +27,10 @@ WebClient/
 WebServer/
 ProjectSettings/
 Temp/
+Win32/
 *.csproj
 *.sln
 *.userprefs
 *.meta
+*.suo
+obj/
